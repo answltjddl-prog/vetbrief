@@ -1,0 +1,11 @@
+{
+  "name": "vetbrief",
+  "version": "1.0.0",
+  "private": true,
+  "description": "VetBrief - AI 수의학 논문 비서 (PWA + Vercel API)",
+  "type": "module",
+  "engines": { "node": ">=20" },
+  "scripts": {
+    "dev": "node dev-server.mjs"
+  }
+}

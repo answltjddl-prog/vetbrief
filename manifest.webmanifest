@@ -1,0 +1,24 @@
+{
+  "name": "VetBrief 수의 논문 비서",
+  "short_name": "VetBrief",
+  "description": "수의학 논문을 검색하고 축종·용량·부작용·예후를 한국어 표로 정리해 주는 AI 논문 비서",
+  "lang": "ko",
+  "id": "/",
+  "start_url": "/?source=pwa",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#f4f5f8",
+  "theme_color": "#0f1e3a",
+  "categories": ["medical", "education", "productivity"],
+  "icons": [
+    { "src": "/icons/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "/icons/icon-512.png", "sizes": "512x512", "type": "image/png" },
+    { "src": "/icons/maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ],
+  "shortcuts": [
+    { "name": "새 논문", "url": "/?view=feed" },
+    { "name": "논문 검색", "url": "/?view=search" },
+    { "name": "내 논문 PDF 분석", "url": "/?view=upload" }
+  ]
+}

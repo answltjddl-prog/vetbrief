@@ -1,0 +1,828 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>VetBrief 수의 논문 비서</title>
+<meta name="description" content="매일 새로 나오는 수의학 논문을 한국어로. 축종·용량·부작용·예후를 표로 정리해 주는 수의사용 논문 앱">
+<link rel="manifest" href="/manifest.webmanifest">
+<link rel="icon" href="/icons/favicon-32.png" sizes="32x32">
+<link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
+<meta name="theme-color" content="#f4f5f8" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0b0f17" media="(prefers-color-scheme: dark)">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="VetBrief">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
+<style>
+/* Layout idea: a Korean news-feed app for vets. Navy live band on top, date-grouped paper feed, coral "AI 요약" as the one action that costs a credit. Detail opens as a side sheet (desktop) or full screen (phone). */
+:root{
+  --bg:#f4f5f8; --surface:#ffffff; --sunken:#eef0f5; --ink:#0e1525; --muted:#5e6678; --faint:#8a93a6; --line:#e3e6ee;
+  --navy:#0f1e3a; --navy-ink:#ffffff; --navy-muted:#a9b6d3;
+  --accent:#ff5a3c; --accent-ink:#ffffff; --accent-soft:#ffede8;
+  --mint:#0b9a84; --mint-soft:#e2f6f2; --signal:#b86e00; --signal-soft:#fff3dc; --danger:#c62828;
+  --font:"Pretendard Variable", Pretendard, -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Malgun Gothic", system-ui, sans-serif;
+  --mono:ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  --sat:env(safe-area-inset-top,0px); --sab:env(safe-area-inset-bottom,0px); --sal:env(safe-area-inset-left,0px); --sar:env(safe-area-inset-right,0px);
+  --r:16px; color-scheme:light;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#0b0f17; --surface:#131a26; --sunken:#0f1520; --ink:#eef1f6; --muted:#a0a9ba; --faint:#6f798c; --line:#222b3a;
+    --navy:#17264a; --navy-ink:#ffffff; --navy-muted:#9fb0d6;
+    --accent:#ff7a5e; --accent-ink:#1a0c08; --accent-soft:#3a1f19;
+    --mint:#2fd1b5; --mint-soft:#0f2e2a; --signal:#f0b149; --signal-soft:#33260f; --danger:#ff8a80; color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#0b0f17; --surface:#131a26; --sunken:#0f1520; --ink:#eef1f6; --muted:#a0a9ba; --faint:#6f798c; --line:#222b3a;
+  --navy:#17264a; --navy-ink:#ffffff; --navy-muted:#9fb0d6;
+  --accent:#ff7a5e; --accent-ink:#1a0c08; --accent-soft:#3a1f19;
+  --mint:#2fd1b5; --mint-soft:#0f2e2a; --signal:#f0b149; --signal-soft:#33260f; --danger:#ff8a80; color-scheme:dark;
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0}
+body{background:var(--bg);color:var(--ink);font-family:var(--font);font-size:15px;line-height:1.55;letter-spacing:-.01em;-webkit-font-smoothing:antialiased;-webkit-text-size-adjust:100%;font-feature-settings:"tnum"}
+button,input,textarea{font:inherit;color:inherit;letter-spacing:inherit}
+button{cursor:pointer}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+h1,h2,h3{margin:0;text-wrap:balance;letter-spacing:-.025em}
+a{color:inherit}
+.view,.list,.stack{display:grid;grid-template-columns:minmax(0,1fr);gap:12px;align-content:start}
+.view[hidden]{display:none!important}
+
+/* ---------- top bar ---------- */
+.top{position:sticky;top:0;z-index:20;background:color-mix(in srgb,var(--bg) 88%,transparent);backdrop-filter:saturate(1.4) blur(14px);-webkit-backdrop-filter:saturate(1.4) blur(14px);padding-top:var(--sat);border-bottom:1px solid transparent}
+.top.scrolled{border-bottom-color:var(--line)}
+.top-in{max-width:1240px;margin:0 auto;padding:10px calc(18px + var(--sar)) 10px calc(18px + var(--sal));display:flex;align-items:center;gap:16px}
+.logo{display:flex;align-items:center;gap:9px;text-decoration:none;flex:none}
+.logo svg{width:32px;height:32px;border-radius:9px}
+.logo b{font-size:19px;font-weight:800;letter-spacing:-.04em}
+.nav{display:flex;gap:2px;margin-left:8px}
+.nav button{border:0;background:transparent;padding:8px 12px;border-radius:10px;font-size:15px;font-weight:600;color:var(--muted);display:flex;align-items:center;gap:6px;position:relative}
+.nav button svg{display:none}
+.nav button[aria-selected="true"]{color:var(--ink);background:var(--surface);box-shadow:0 1px 2px rgba(15,30,58,.08)}
+.nav .dot{width:7px;height:7px;border-radius:50%;background:var(--accent);display:none}
+.nav .dot.on{display:inline-block}
+.spacer{flex:1}
+.usage{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--muted);background:var(--surface);border-radius:999px;padding:6px 6px 6px 12px;white-space:nowrap;box-shadow:inset 0 0 0 1px var(--line)}
+.usage strong{color:var(--ink);font-weight:700}
+.usage .up{border:0;background:var(--navy);color:var(--navy-ink);border-radius:999px;padding:4px 10px;font-size:12px;font-weight:700}
+@media (max-width:760px){
+  .top{backdrop-filter:none;-webkit-backdrop-filter:none;background:var(--bg)}
+  .top-in{padding:8px calc(16px + var(--sar)) 8px calc(16px + var(--sal))}
+  .nav{position:fixed;left:0;right:0;bottom:0;margin:0;z-index:30;background:var(--surface);border-top:1px solid var(--line);padding:6px calc(6px + var(--sar)) calc(6px + var(--sab)) calc(6px + var(--sal));justify-content:space-around}
+  .nav button{flex:1;flex-direction:column;gap:3px;font-size:11px;padding:5px 2px;background:transparent!important;box-shadow:none!important}
+  .nav button svg{display:block}
+  .nav button[aria-selected="true"]{color:var(--ink)}
+  .nav button[aria-selected="false"] svg{opacity:.55}
+  .nav .dot{position:absolute;top:4px;right:calc(50% - 16px)}
+  .usage .up,.usage .long{display:none}
+  .usage{padding:6px 12px}
+  body{padding-bottom:calc(66px + var(--sab))}
+}
+@media (min-width:761px){.usage .short{display:none}}
+
+/* ---------- layout ---------- */
+main{max-width:1240px;margin:0 auto;padding:6px calc(18px + var(--sar)) 60px calc(18px + var(--sal));display:grid;grid-template-columns:minmax(0,1fr);gap:22px}
+@media (min-width:1040px){main{grid-template-columns:minmax(0,1fr) minmax(0,1.08fr)}}
+@media (max-width:760px){main{padding:4px calc(16px + var(--sar)) 40px calc(16px + var(--sal))}}
+
+/* ---------- live band ---------- */
+.live{background:var(--navy);color:var(--navy-ink);border-radius:22px;padding:20px 20px 16px;display:grid;gap:14px;position:relative;overflow:hidden}
+.live::after{content:"";position:absolute;right:-40px;top:-60px;width:220px;height:220px;border-radius:50%;background:radial-gradient(closest-side,rgba(255,90,60,.35),transparent);pointer-events:none}
+.live-row{display:flex;align-items:center;gap:10px;flex-wrap:wrap;position:relative;z-index:1}
+.pulse{display:inline-flex;align-items:center;gap:7px;font-size:12px;font-weight:700;letter-spacing:.04em;color:#fff;background:rgba(255,255,255,.1);border-radius:999px;padding:4px 10px 4px 8px}
+.pulse i{width:8px;height:8px;border-radius:50%;background:var(--accent);box-shadow:0 0 0 0 rgba(255,90,60,.7);animation:pulse 1.8s infinite}
+@keyframes pulse{70%{box-shadow:0 0 0 8px rgba(255,90,60,0)}100%{box-shadow:0 0 0 0 rgba(255,90,60,0)}}
+.live .updated{font-size:12.5px;color:var(--navy-muted)}
+.big{display:flex;align-items:flex-end;gap:22px;flex-wrap:wrap;position:relative;z-index:1}
+.big div{display:grid}
+.big small{font-size:13px;color:var(--navy-muted);font-weight:500}
+.big strong{font-size:40px;font-weight:800;line-height:1.05;letter-spacing:-.04em}
+.big strong span{font-size:18px;font-weight:700;margin-left:2px}
+.big .sub2 strong{font-size:24px}
+.live p{margin:0;font-size:13px;color:var(--navy-muted);position:relative;z-index:1}
+.days{display:inline-flex;background:rgba(255,255,255,.1);border-radius:12px;padding:3px;margin-left:auto}
+.days button{border:0;background:transparent;color:var(--navy-muted);font-size:13px;font-weight:600;padding:5px 12px;border-radius:9px}
+.days button[aria-pressed="true"]{background:#fff;color:var(--navy)}
+
+/* ---------- chips ---------- */
+.rail{display:flex;gap:7px;overflow-x:auto;scrollbar-width:none;-webkit-overflow-scrolling:touch;padding:2px 0}
+.rail::-webkit-scrollbar{display:none}
+.chip{flex:none;border:0;background:var(--surface);box-shadow:inset 0 0 0 1px var(--line);border-radius:999px;padding:7px 13px;font-size:14px;font-weight:600;color:var(--muted);display:inline-flex;align-items:center;gap:6px}
+.chip[aria-pressed="true"]{background:var(--ink);color:var(--bg);box-shadow:none}
+.chip .sd{width:8px;height:8px;border-radius:50%}
+.chip.ghost{background:transparent;box-shadow:inset 0 0 0 1.5px var(--line);border-style:dashed;color:var(--muted)}
+.chip.topic[aria-pressed="true"]{background:var(--accent);color:var(--accent-ink)}
+.label{font-size:12.5px;font-weight:700;color:var(--faint);letter-spacing:.02em;margin:2px 2px -4px}
+.sp-dog{background:#e8833a}.sp-cat{background:#8b5cf6}.sp-horse{background:#a16207}.sp-cattle{background:#16a34a}.sp-pig{background:#ec4899}.sp-bird{background:#0ea5e9}.sp-exotic{background:#14b8a6}
+
+/* ---------- search ---------- */
+.searchbar{display:flex;gap:8px}
+.field{flex:1;min-width:0;display:flex;align-items:center;gap:10px;background:var(--surface);border-radius:16px;padding:0 14px;height:52px;box-shadow:inset 0 0 0 1.5px var(--line)}
+.field:focus-within{box-shadow:inset 0 0 0 2px var(--ink)}
+.field input{flex:1;border:0;background:transparent;outline:none;font-size:17px;min-width:0}
+.field svg{flex:none;color:var(--faint)}
+.seg{display:inline-flex;background:var(--sunken);border-radius:11px;padding:3px}
+.seg button{border:0;background:transparent;padding:5px 11px;font-size:13px;font-weight:600;color:var(--muted);border-radius:8px}
+.seg button[aria-pressed="true"]{background:var(--surface);color:var(--ink);box-shadow:0 1px 2px rgba(15,30,58,.1)}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+
+/* ---------- buttons ---------- */
+.btn{border:0;background:var(--surface);box-shadow:inset 0 0 0 1px var(--line);border-radius:12px;padding:9px 15px;font-weight:600;font-size:14px;display:inline-flex;align-items:center;justify-content:center;gap:6px;white-space:nowrap;text-decoration:none;color:var(--ink);min-height:40px}
+.btn:hover{box-shadow:inset 0 0 0 1px var(--faint)}
+.btn.dark{background:var(--ink);color:var(--bg);box-shadow:none}
+.btn.ai{background:var(--accent);color:var(--accent-ink);box-shadow:none;font-weight:700}
+.btn.ai:hover{filter:brightness(1.05)}
+.btn.plain{background:transparent;box-shadow:none;color:var(--muted)}
+.btn.sm{padding:6px 12px;font-size:13.5px;border-radius:10px;min-height:34px}
+.btn.icon{width:36px;padding:0;min-height:36px;border-radius:10px}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+
+/* ---------- paper card ---------- */
+.day{font-size:13px;font-weight:700;color:var(--muted);margin:10px 4px -2px;display:flex;gap:8px;align-items:baseline}
+.day span{font-weight:500;color:var(--faint)}
+.card{background:var(--surface);border-radius:var(--r);padding:16px 16px 12px;display:grid;gap:8px;box-shadow:0 1px 2px rgba(15,30,58,.04);border:1px solid var(--line);transition:border-color .15s}
+.card.active{border-color:var(--ink)}
+.card .top-line{display:flex;align-items:center;gap:8px;font-size:12.5px;color:var(--faint);min-width:0}
+.card .jr{font-weight:700;color:var(--mint);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
+.card .when{margin-left:auto;flex:none}
+.card h3{font-size:17px;font-weight:700;line-height:1.45}
+.card .en{font-size:13.5px;color:var(--muted);line-height:1.45;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.card .en.solo{font-size:16px;font-weight:650;color:var(--ink);-webkit-line-clamp:3}
+.card .pending{font-size:12.5px;color:var(--faint)}
+.tags{display:flex;gap:5px;flex-wrap:wrap}
+.tag{display:inline-flex;align-items:center;gap:5px;font-size:12px;font-weight:600;border-radius:7px;padding:2px 8px;background:var(--sunken);color:var(--muted)}
+.tag .sd{width:7px;height:7px;border-radius:50%}
+.tag.rct{background:var(--mint-soft);color:var(--mint)}
+.tag.oa{background:transparent;box-shadow:inset 0 0 0 1px var(--line)}
+.tag.pp{background:var(--signal-soft);color:var(--signal)}
+.acts{display:flex;align-items:center;gap:6px;margin-top:2px}
+.acts .fill{flex:1}
+.done{font-size:12px;font-weight:700;color:var(--mint)}
+.skel{height:132px;border-radius:var(--r);background:linear-gradient(90deg,var(--surface),var(--sunken),var(--surface));background-size:200% 100%;animation:sh 1.3s linear infinite}
+@keyframes sh{to{background-position:-200% 0}}
+.empty{padding:28px 18px;text-align:center;color:var(--muted);background:var(--surface);border-radius:var(--r);border:1px dashed var(--line)}
+.more{display:flex;justify-content:center;padding:4px 0}
+.newpill{position:sticky;top:calc(var(--hdr,60px) + 8px);z-index:15;justify-self:center;border:0;background:var(--ink);color:var(--bg);font-weight:700;font-size:14px;border-radius:999px;padding:9px 16px;box-shadow:0 6px 18px rgba(15,30,58,.25);display:none}
+.newpill.on{display:inline-flex}
+.headline{display:flex;justify-content:space-between;align-items:center;gap:10px;font-size:13.5px;color:var(--muted);margin:0 4px}
+.headline code{font-family:var(--mono);font-size:11.5px;background:var(--sunken);border-radius:6px;padding:2px 7px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:55%}
+
+/* ---------- detail sheet ---------- */
+.detail{background:var(--surface);border-radius:22px;padding:22px;align-self:start;display:grid;grid-template-columns:minmax(0,1fr);gap:16px;border:1px solid var(--line)}
+@media (min-width:1040px){.detail{position:sticky;top:calc(var(--hdr,60px) + 10px);max-height:calc(100vh - var(--hdr,60px) - 24px);overflow:auto}}
+@media (max-width:1039px){
+  .detail{position:fixed;inset:0;height:100%;align-self:stretch;z-index:40;border-radius:0;border:0;overflow:auto;padding:calc(12px + var(--sat)) calc(18px + var(--sar)) calc(40px + var(--sab)) calc(18px + var(--sal));display:none;align-content:start;-webkit-overflow-scrolling:touch}
+  .detail.open{display:grid}
+}
+.d-close{display:none}
+@media (max-width:1039px){.d-close{display:inline-flex}}
+.d-head{display:flex;gap:12px;align-items:flex-start}
+.d-head>div{flex:1;min-width:0;display:grid;gap:6px}
+.d-head>button{flex:none}
+.kicker{display:flex;gap:6px;align-items:center;flex-wrap:wrap;font-size:12.5px;font-weight:700;color:var(--accent)}
+.kicker.ex{color:var(--signal)}
+.basis{font-size:11.5px;border-radius:6px;padding:2px 7px;font-weight:700}
+.basis.full{background:var(--mint-soft);color:var(--mint)}
+.basis.abs{background:var(--signal-soft);color:var(--signal)}
+.d-head h2{font-size:20px;font-weight:800;line-height:1.38}
+.cite{font-size:13px;color:var(--muted)}
+.verdict{background:var(--navy);color:var(--navy-ink);border-radius:16px;padding:14px 16px;display:grid;gap:10px}
+.verdict p{margin:0;font-size:17px;font-weight:700;line-height:1.45}
+.verdict .facts{display:flex;gap:6px;flex-wrap:wrap}
+.verdict .facts span{font-size:12.5px;background:rgba(255,255,255,.1);color:var(--navy-muted);border-radius:7px;padding:3px 8px}
+.verdict .facts b{color:#fff;font-weight:700}
+.grade{display:inline-grid;place-items:center;width:18px;height:18px;border-radius:5px;font-weight:800;font-size:11px;color:var(--navy);background:#fff;margin-right:3px}
+.sheet{display:grid;gap:10px}
+.sec{border-radius:14px;background:var(--sunken);padding:14px 14px 12px;display:grid;gap:6px}
+.sec h4{margin:0;font-size:13px;font-weight:800;color:var(--muted);display:flex;align-items:center;gap:7px}
+.sec h4 i{width:22px;height:22px;border-radius:7px;display:inline-grid;place-items:center;font-style:normal;font-size:11px;font-weight:800;color:#fff}
+.sec .v{font-size:15px;font-weight:600}
+.sec ul{margin:0;padding-left:18px;font-size:14.5px}
+.sec li+li{margin-top:3px}
+.sec .sub{color:var(--muted);font-size:13.5px}
+.dose{display:grid;gap:8px}
+.dose .d{background:var(--surface);border-radius:12px;padding:10px 12px;display:grid;gap:4px}
+.dose .d b{font-size:15px}
+.dose .amt{font-size:20px;font-weight:800;color:var(--accent);letter-spacing:-.02em}
+.dose .meta{display:flex;gap:6px;flex-wrap:wrap;font-size:12.5px;color:var(--muted)}
+.dose .meta span{background:var(--sunken);border-radius:6px;padding:1px 7px}
+.missing{font-size:13.5px;color:var(--signal);background:var(--signal-soft);border-radius:12px;padding:10px 12px}
+.quotes{display:grid;gap:6px;font-size:13.5px}
+.quotes div{border-left:3px solid var(--line);padding-left:10px;color:var(--muted)}
+.quotes b{color:var(--ink);margin-right:6px}
+.d-acts{display:flex;gap:8px;flex-wrap:wrap}
+.fine{font-size:12px;color:var(--faint);line-height:1.5}
+.loading{display:grid;gap:10px}
+.loading p{margin:0;font-size:14px;color:var(--muted)}
+.loading .l{height:16px;border-radius:8px;background:linear-gradient(90deg,var(--sunken),var(--line),var(--sunken));background-size:200% 100%;animation:sh 1.2s linear infinite}
+.err{color:var(--danger);font-size:14px;background:var(--surface);border:1px solid var(--danger);border-radius:12px;padding:12px}
+.study{display:grid;border-radius:14px;overflow:hidden;border:1px solid var(--line)}
+.srow{display:grid;grid-template-columns:1fr 1fr;border-top:1px solid var(--line)}
+.srow:first-child{border-top:0}
+.srow>div{padding:11px 13px;font-size:14px}
+.srow .en{background:var(--sunken);font-size:13.5px;color:var(--muted)}
+@media (max-width:640px){.srow{grid-template-columns:1fr}}
+.gloss{display:grid;gap:8px;grid-template-columns:repeat(auto-fill,minmax(190px,1fr))}
+.gloss div{background:var(--sunken);border-radius:12px;padding:10px 12px;font-size:13px;color:var(--muted)}
+.gloss b{display:block;font-size:14px;color:var(--ink)}
+.gloss em{font-style:normal;color:var(--ink);font-weight:600}
+.panel{background:var(--surface);border-radius:22px;padding:20px;display:grid;grid-template-columns:minmax(0,1fr);gap:12px;border:1px solid var(--line)}
+.panel h2{font-size:20px;font-weight:800}
+.panel p{margin:0;color:var(--muted);font-size:14px}
+.drop{border:2px dashed var(--line);border-radius:16px;padding:24px;text-align:center;color:var(--muted);display:grid;gap:6px;justify-items:center;cursor:pointer}
+.drop.over{border-color:var(--accent);background:var(--accent-soft)}
+textarea{width:100%;min-height:150px;border:0;box-shadow:inset 0 0 0 1px var(--line);border-radius:14px;padding:12px;background:var(--sunken);resize:vertical;font-size:15px}
+.plans{display:grid;gap:12px;grid-template-columns:repeat(auto-fit,minmax(210px,1fr))}
+.plan{background:var(--surface);border-radius:18px;padding:16px;display:grid;gap:8px;align-content:start;border:1px solid var(--line)}
+.plan.cur{border:2px solid var(--ink);padding:15px}
+.plan .for{font-size:12.5px;font-weight:700;color:var(--accent)}
+.plan h3{font-size:17px;font-weight:800}
+.plan .price{font-size:26px;font-weight:800;letter-spacing:-.03em}
+.plan .price small{font-size:13px;color:var(--muted);font-weight:500}
+.plan ul{margin:0;padding-left:18px;font-size:14px;color:var(--muted)}
+.modal-bg{position:fixed;inset:0;background:rgba(8,12,22,.55);z-index:80;display:none;place-items:center;padding:16px}
+.modal-bg.open{display:grid}
+.modal{background:var(--surface);border-radius:22px;max-width:440px;width:100%;padding:22px;display:grid;gap:12px;max-height:90vh;overflow:auto}
+.modal h3{font-size:19px;font-weight:800}
+.modal p{margin:0;color:var(--muted);font-size:14px}
+.modal ol{margin:0;padding-left:20px;font-size:14.5px;display:grid;gap:7px}
+.modal input{border:0;box-shadow:inset 0 0 0 1.5px var(--line);border-radius:12px;padding:12px 14px;font-size:16px;background:var(--sunken);width:100%}
+.copybox{width:100%;min-height:160px;font-family:var(--mono);font-size:12.5px}
+.toast{position:fixed;left:50%;bottom:calc(88px + var(--sab));transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:10px 18px;border-radius:999px;font-size:14px;font-weight:600;z-index:90;opacity:0;pointer-events:none;transition:opacity .2s;max-width:90vw;text-align:center}
+.toast.show{opacity:1}
+.scope{display:grid;grid-template-columns:1fr 1fr;background:var(--sunken);border-radius:16px;padding:4px;gap:4px}
+.scope button{border:0;background:transparent;border-radius:12px;padding:10px 8px;font-size:15px;font-weight:700;color:var(--muted);display:flex;flex-direction:column;align-items:center;gap:1px;line-height:1.3}
+.scope button small{font-size:11.5px;font-weight:500;color:var(--faint)}
+.scope button[aria-pressed="true"]{background:var(--surface);color:var(--ink);box-shadow:0 1px 3px rgba(15,30,58,.12)}
+.scope button[aria-pressed="true"] small{color:var(--muted)}
+.via{font-size:11px;font-weight:700;letter-spacing:.02em;color:var(--faint);border:1px solid var(--line);border-radius:5px;padding:0 5px;flex:none}
+.tag.kr{background:#eef2ff;color:#3b4fd8}
+.kosum{background:var(--sunken);border-radius:14px;padding:12px 14px;font-size:14.5px;line-height:1.65}
+.banner{font-size:13.5px;background:var(--signal-soft);color:var(--ink);border-radius:12px;padding:10px 12px}
+@media (prefers-reduced-motion:reduce){.pulse i,.skel,.loading .l{animation:none}}
+</style>
+</head>
+<body>
+<header class="top" id="top">
+  <div class="top-in">
+    <a class="logo" href="/" aria-label="VetBrief 처음으로">
+      <svg viewBox="0 0 32 32" aria-hidden="true"><rect width="32" height="32" rx="8" fill="#0f1e3a"/><path d="M9 10l7 13 7-13" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/><circle cx="24.5" cy="23" r="2.6" fill="#ff5a3c"/></svg>
+      <b>VetBrief</b>
+    </a>
+    <nav class="nav" role="tablist" aria-label="화면">
+      <button role="tab" aria-selected="true" data-view="feed"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M4 5h16M4 12h16M4 19h10"/></svg>새 논문<i class="dot" id="feed-dot"></i></button>
+      <button role="tab" aria-selected="false" data-view="search"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>검색</button>
+      <button role="tab" aria-selected="false" data-view="upload"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><path d="M14 3v6h6"/></svg>내 PDF</button>
+      <button role="tab" aria-selected="false" data-view="saved"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M6 3h12v18l-6-4-6 4z"/></svg>저장함</button>
+      <button role="tab" aria-selected="false" data-view="me"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 21c1.5-4 4.5-6 8-6s6.5 2 8 6"/></svg>내 정보</button>
+    </nav>
+    <span class="spacer"></span>
+    <div class="usage" id="usage" title="이번 달 AI 요약 남은 횟수"></div>
+  </div>
+</header>
+
+<main>
+  <!-- FEED -->
+  <section class="view" id="view-feed">
+    <div id="banner"></div>
+    <div class="scope" role="group" aria-label="해외 또는 국내"><button type="button" data-fscope="global" aria-pressed="true">해외 논문<small>PubMed·OpenAlex 등</small></button><button type="button" data-fscope="kr" aria-pressed="false">국내 논문<small>국내 학술지·한국 연구진</small></button></div>
+    <div class="live" id="live"></div>
+    <div class="label">축종</div>
+    <div class="rail" id="feed-sp"></div>
+    <div class="label">분야</div>
+    <div class="rail" id="feed-cat"></div>
+    <div class="label">관심 주제 새 논문</div>
+    <div class="rail" id="topics"></div>
+    <button class="newpill" id="newpill" type="button" data-act="showNew"></button>
+    <div class="list" id="feed-list"></div>
+  </section>
+
+  <!-- SEARCH -->
+  <section class="view" id="view-search" hidden>
+    <div class="scope" role="group" aria-label="해외 또는 국내"><button type="button" data-sscope="global" aria-pressed="true">해외 논문<small>PubMed·OpenAlex 등</small></button><button type="button" data-sscope="kr" aria-pressed="false">국내 논문<small>KCI·한국 연구진</small></button></div>
+    <div id="search-note"></div>
+    <form class="searchbar" id="search-form" role="search">
+      <label class="field" for="q">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+        <input id="q" type="search" enterkeyhint="search" autocomplete="off" placeholder="질환, 약 이름, 증상을 한국어로" aria-label="논문 검색어">
+      </label>
+      <button class="btn dark" type="submit" style="min-height:52px;border-radius:16px;padding:0 18px">검색</button>
+    </form>
+    <div class="rail" id="suggest"></div>
+    <div class="rail" id="search-sp"></div>
+    <div class="rail" id="search-cat"></div>
+    <div class="row">
+      <div class="seg" aria-label="기간"><button type="button" data-years="all" aria-pressed="false">전체 기간</button><button type="button" data-years="5" aria-pressed="true">5년</button><button type="button" data-years="2" aria-pressed="false">2년</button></div>
+      <div class="seg" aria-label="정렬"><button type="button" data-sort="rel" aria-pressed="true">관련도</button><button type="button" data-sort="new" aria-pressed="false">최신순</button></div>
+    </div>
+    <div class="list" id="search-list"></div>
+  </section>
+
+  <!-- UPLOAD -->
+  <section class="view" id="view-upload" hidden>
+    <div class="panel">
+      <h2>내가 가진 논문 분석</h2>
+      <p>학교·병원 도서관에서 받은 PDF나 초록을 넣으면 같은 형식으로 정리해요. PDF 글자 추출은 내 기기 안에서 하고, 추출한 글자만 AI로 보냅니다.</p>
+      <label class="drop" id="drop" for="pdf">
+        <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><path d="M14 3v6h6M12 18v-6M9 15l3-3 3 3"/></svg>
+        <strong style="color:var(--ink);font-size:16px">PDF 파일 선택</strong>
+        <span style="font-size:13px">컴퓨터에서는 끌어다 놓아도 돼요 · 앞 30쪽까지 읽어요</span>
+        <input id="pdf" type="file" accept="application/pdf,.pdf" style="display:none">
+      </label>
+      <div class="label" style="margin:0">또는 초록·본문 붙여넣기</div>
+      <textarea id="paste" placeholder="Abstract — Background: ... Animals: ... Methods: ... Results: ..."></textarea>
+      <div class="row"><button class="btn ai" id="analyze" type="button">AI 임상 요약 만들기</button><span id="upload-status" style="font-size:13px;color:var(--muted)"></span></div>
+    </div>
+  </section>
+
+  <!-- SAVED -->
+  <section class="view" id="view-saved" hidden>
+    <div class="headline"><span id="saved-count"></span><span>이 기기에 저장됨</span></div>
+    <div class="list" id="saved-list"></div>
+  </section>
+
+  <!-- ME -->
+  <section class="view" id="view-me" hidden style="grid-column:1/-1">
+    <div class="panel">
+      <h2>앱 설치</h2>
+      <p>홈 화면이나 바탕화면에 설치하면 앱처럼 전체 화면으로 열리고, 새 논문을 바로 볼 수 있어요.</p>
+      <div><button class="btn dark" type="button" data-act="install">VetBrief 설치하기</button></div>
+    </div>
+    <div class="panel">
+      <h2>요금제</h2>
+      <p>새 논문 피드와 검색은 무료예요. AI 임상 요약·학습 번역·PDF 분석은 횟수제입니다. 베타 기간에는 결제 없이 바로 전환돼요.</p>
+      <div class="plans" id="plans"></div>
+    </div>
+  </section>
+
+  <aside class="detail" id="detail" aria-live="polite"></aside>
+</main>
+
+<div class="modal-bg" id="modal"><div class="modal" role="dialog" aria-modal="true" aria-labelledby="modal-t" id="modal-box"></div></div>
+<div class="toast" id="toast" role="status"></div>
+
+<script>
+/* ================= constants ================= */
+const SPECIES=[["all","전체"],["dog","개"],["cat","고양이"],["horse","말"],["cattle","소·반추"],["pig","돼지"],["bird","가금·조류"],["exotic","특수동물"]];
+const SPKO=Object.fromEntries(SPECIES);
+const CATS=[["all","전체 분야"],["renal","신장·비뇨"],["cardio","심장"],["derm","피부·알레르기"],["endo","내분비"],["pain","통증·마취·정형"],["behav","행동·복지"],["gi","소화기·간"],["onco","종양"],["infect","감염·백신"]];
+const SUGGEST=["고양이 만성신부전","이첨판 피모벤단","고양이 당뇨 SGLT2","가바펜틴 진정","리브렐라 부작용","아포퀠 용량","개 림프종 CHOP","젖소 유방염","돼지 ASF"];
+const PLANS={
+ free:{name:"무료",limit:5,price:"₩0",for:"처음 써보는 분",perks:["새 논문 피드·검색 무제한","AI 임상 요약 월 5회","학습 번역·PDF 분석도 1회씩 차감"]},
+ student:{name:"수의대생 Pro",limit:100,price:"₩4,900",for:"과제·케이스 스터디",perks:["AI 요약 월 100회","원문+번역 학습 모드","용어 사전","관심 주제 무제한"]},
+ clinic:{name:"임상 Pro",limit:300,price:"₩14,900",for:"로컬 임상 수의사",perks:["AI 요약 월 300회","PDF 분석","차트 복사 템플릿","관심 주제 새 논문 알림(예정)"]},
+ team:{name:"병원 팀",limit:1500,price:"₩39,000",for:"수의사 5인까지",perks:["팀 공유 저장함(예정)","월 1,500회 공동 사용","병원 단위 세금계산서"]}
+};
+const POLL_MS=5*60*1000;
+
+/* ================= state (this device) ================= */
+const monthKey=()=>{const d=new Date();return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0");};
+let S={plan:"free",month:monthKey(),used:0,saved:[],cache:{},study:{},ko:{},code:"",topics:["고양이 만성신부전","이첨판 질환"],seen:{}};
+try{const raw=localStorage.getItem("vetbrief.v3");if(raw)S={...S,...JSON.parse(raw)};}catch(e){}
+if(S.month!==monthKey()){S.month=monthKey();S.used=0;}
+function save(){try{localStorage.setItem("vetbrief.v3",JSON.stringify(S));}catch(e){}}
+const limit=()=>PLANS[S.plan].limit, left=()=>Math.max(0,limit()-S.used);
+
+/* ================= helpers ================= */
+const $=s=>document.querySelector(s);
+const esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+function toast(m){const t=$("#toast");t.textContent=m;t.classList.add("show");clearTimeout(toast._t);toast._t=setTimeout(()=>t.classList.remove("show"),2600);}
+function openModal(h){$("#modal-box").innerHTML=h;$("#modal").classList.add("open");}
+function closeModal(){$("#modal").classList.remove("open");}
+const kstNow=()=>new Date(Date.now()+9*3600e3);
+const ymd=d=>d.toISOString().slice(0,10);
+function dayLabel(date){
+  if(!date) return "날짜 미상";
+  const t=ymd(kstNow()), y=ymd(new Date(kstNow()-86400e3));
+  const d=new Date(date+"T00:00:00Z"); const w="일월화수목금토"[d.getUTCDay()];
+  const md=`${d.getUTCMonth()+1}월 ${d.getUTCDate()}일 (${w})`;
+  return date===t?`오늘 <span>${md}</span>`:date===y?`어제 <span>${md}</span>`:md;
+}
+function whenShort(date){
+  if(!date) return "";
+  const diff=Math.round((new Date(ymd(kstNow())+"T00:00:00Z")-new Date(date+"T00:00:00Z"))/86400e3);
+  return diff<=0?"오늘":diff===1?"어제":diff<7?`${diff}일 전`:date.slice(5).replace("-",".");
+}
+function ago(iso){const m=Math.max(0,Math.round((Date.now()-new Date(iso))/60000));return m<1?"방금":m<60?`${m}분 전`:`${Math.round(m/60)}시간 전`;}
+
+async function api(path,{method="GET",body}={}){
+  let r;
+  try{r=await fetch(path,{method,headers:{"content-type":"application/json","x-access-code":S.code||""},body:body?JSON.stringify(body):undefined});}
+  catch(e){throw {code:"offline"};}
+  const data=await r.json().catch(()=>({}));
+  if(r.status===401&&data.error==="access_code"){await askCode();return api(path,{method,body});}
+  if(!r.ok) throw {code:data.error||"server",message:data.message};
+  return data;
+}
+function askCode(){
+  return new Promise(resolve=>{
+    openModal(`<h3 id="modal-t">베타 접속 코드</h3><p>지금은 초대받은 분만 AI 기능과 검색을 쓸 수 있어요. 받은 코드를 입력해 주세요. 새 논문 피드는 코드 없이 볼 수 있어요.</p><form id="code-form" style="display:grid;gap:10px"><input id="code-in" autocomplete="off" autocapitalize="off" placeholder="접속 코드" value="${esc(S.code)}"><button class="btn dark" type="submit">확인</button></form>`);
+    setTimeout(()=>$("#code-in")?.focus(),50);
+    $("#code-form").onsubmit=e=>{e.preventDefault();S.code=$("#code-in").value.trim();save();closeModal();resolve();};
+  });
+}
+function errText(e){
+  const c=e&&e.code;
+  if(c==="offline") return "인터넷 연결을 확인해 주세요.";
+  if(c==="no_key") return "서버에 Claude API 키가 아직 설정되지 않았어요.";
+  if(c==="rate_limited") return "요청이 많아 잠시 쉬어가야 해요. 1분 뒤 다시 시도해 주세요. 이번 시도는 횟수에서 빠지지 않았어요.";
+  if(["no_text","too_short","not_found"].includes(c)) return e.message;
+  return (e&&e.message?e.message+" ":"")+"다시 시도해 주세요. 이번 시도는 횟수에서 빠지지 않았어요.";
+}
+function renderUsage(){
+  if(HEALTH.checked&&!HEALTH.ai){$("#usage").innerHTML='<span>베타 · <strong>AI 준비 중</strong></span>';return;}
+  const L=limit(),l=left();
+  $("#usage").innerHTML=`<span><span class="long">AI 요약 </span><strong>${l}</strong><span class="long">/${L}회 남음</span><span class="short">회</span></span>${S.plan==="free"?'<button class="up" type="button" data-go="me">업그레이드</button>':""}`;
+}
+function aiOff(){
+  if(!(HEALTH.checked&&!HEALTH.ai))return false;
+  openModal(`<h3 id="modal-t">AI 기능 준비 중이에요</h3><p>AI 임상 요약·번역·PDF 분석은 곧 열려요. 지금은 새 논문 피드, 검색, 저장, 원문 보기와 ‘번역 학습’의 초록 원문 보기를 쓸 수 있어요.</p><button class="btn dark" type="button" data-act="modal-close">확인</button>`);
+  return true;
+}
+function needCredit(){if(left()>0)return true;showPaywall();return false;}
+function spend(){S.used++;save();renderUsage();}
+
+/* ================= cards ================= */
+let activeKey=null;
+const koFailed=new Set();
+const pool=new Map(); // key -> paper meta seen this session
+function remember(list){list.forEach(p=>{pool.set(p.key,p);if(p.ko)S.ko[p.key]=p.ko;});}
+function cardHTML(p){
+  const ko=S.ko[p.key]||p.ko;
+  const saved=S.saved.some(x=>x.key===p.key);
+  const sp=(p.species||[]).map(s=>`<span class="tag"><i class="sd sp-${s}"></i>${esc(SPKO[s]||s)}</span>`).join("");
+  const des=p.design?`<span class="tag ${p.design==="RCT"||p.design==="체계적 고찰"||p.design==="메타분석"?"rct":p.design==="프리프린트"?"pp":""}">${esc(p.design)}</span>`:"";
+  const authors=p.authors.length>60?p.authors.slice(0,60).replace(/,[^,]*$/,"")+" 외":p.authors;
+  return `<article class="card${p.key===activeKey?" active":""}" data-key="${esc(p.key)}">
+    <div class="top-line"><span class="jr">${esc(p.journal||"학술지 미상")}</span>${p.via?`<span class="via">${esc(p.via)}</span>`:""}<span class="when">${esc(p.date?whenShort(p.date):p.year||"")}</span></div>
+    ${ko?`<h3>${esc(ko)}</h3>${p.title&&p.title!==ko?`<div class="en">${esc(p.title)}</div>`:""}`:`<div class="en solo">${esc(p.title)}</div>${!koFailed.has(p.key)&&ko===undefined?'<div class="pending">한국어 제목 번역 중…</div>':""}`}
+    <div class="tags">${p.kr&&FD.scope!=="kr"?'<span class="tag kr">한국 연구</span>':""}${sp}${des}${p.oa?'<span class="tag oa">전문 공개</span>':""}${p.cited?`<span class="tag oa">인용 ${p.cited}</span>`:""}</div>
+    <div class="cite" style="font-size:12.5px;color:var(--faint)">${esc(authors)}</div>
+    <div class="acts">
+      <button class="btn ai sm" type="button" data-act="sum" data-key="${esc(p.key)}"${HEALTH.checked&&!HEALTH.ai&&!S.cache[p.key]?' style="opacity:.55"':""}>AI 요약</button>
+      <button class="btn sm" type="button" data-act="study" data-key="${esc(p.key)}">번역 학습</button>
+      <span class="fill"></span>${S.cache[p.key]?'<span class="done">요약 있음</span>':""}
+      <button class="btn plain icon" type="button" data-act="save" data-key="${esc(p.key)}" aria-pressed="${saved}" aria-label="${saved?"저장 취소":"저장"}"><svg width="20" height="20" viewBox="0 0 24 24" fill="${saved?"currentColor":"none"}" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M6 3h12v18l-6-4-6 4z"/></svg></button>
+      <a class="btn plain icon" href="${esc(p.url)}" target="_blank" rel="noopener" aria-label="원문 열기"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"/></svg></a>
+    </div>
+  </article>`;
+}
+function groupedHTML(items){
+  let out="",last=null;
+  for(const p of items){const d=p.date||"";if(d!==last){out+=`<div class="day">${dayLabel(d)}</div>`;last=d;}out+=cardHTML(p);}
+  return out;
+}
+async function fillKo(items){
+  if(HEALTH.checked&&!HEALTH.ai){items.forEach(x=>{if(!(S.ko[x.key]||x.ko))koFailed.add(x.key);});rerenderLists();return;}
+  const need=items.filter(x=>!(S.ko[x.key]||x.ko)&&!koFailed.has(x.key));
+  if(!need.length) return;
+  try{
+    const d=await api("/api/titles",{method:"POST",body:{titles:need.map(x=>x.title)}});
+    need.forEach((x,i)=>{if(d.ko[i])S.ko[x.key]=d.ko[i];else koFailed.add(x.key);});
+    trimKo(); save();
+  }catch(e){need.forEach(x=>koFailed.add(x.key));}
+  rerenderLists();
+}
+function trimKo(){const k=Object.keys(S.ko);if(k.length>800)k.slice(0,k.length-800).forEach(x=>delete S.ko[x]);}
+function rerenderLists(){renderFeed();renderSearch();if(!$("#view-saved").hidden)renderSaved();}
+function chipRail(el,items,cur,attr,withDots){
+  el.innerHTML=items.map(([k,ko])=>`<button class="chip" type="button" data-${attr}="${k}" aria-pressed="${cur===k}">${withDots&&k!=="all"?`<i class="sd sp-${k}"></i>`:""}${esc(ko)}</button>`).join("");
+}
+
+/* ================= feed ================= */
+let FD={scope:"global",days:7,cat:"all",sp:"all",topic:null};
+let HEALTH={};
+let FR={items:[],next:null,total:0,today:null,updated:null,loading:false,error:null,token:0,pending:null};
+function renderLive(){
+  const daysTxt={1:"오늘",7:"최근 7일",30:"최근 30일"}[FD.days];
+  const t=FD.topic;
+  $("#live").innerHTML=`
+    <div class="live-row"><span class="pulse"><i></i>LIVE</span><span class="updated">${FR.updated?`${ago(FR.updated)} 업데이트 · 10분마다 자동 수집`:"수집 중…"}</span>
+      <div class="days" role="group" aria-label="기간">${[1,7,30].map(d=>`<button type="button" data-days="${d}" aria-pressed="${FD.days===d}">${d===1?"오늘":d+"일"}</button>`).join("")}</div></div>
+    <div class="big">
+      ${t?`<div><small>관심 주제 · ${esc(t)}</small><strong>${FR.loading&&!FR.items.length?"…":FR.total.toLocaleString()}<span>편</span></strong></div>`:
+      `<div><small>오늘 새로 나온 ${FD.scope==="kr"?"국내":"해외"} 수의학 논문</small><strong>${FR.today==null?"…":FR.today.toLocaleString()}<span>편</span></strong></div>
+       <div class="sub2"><small>${daysTxt}${FD.sp!=="all"?` · ${SPKO[FD.sp]}`:""}${FD.cat!=="all"?` · ${CATS.find(c=>c[0]===FD.cat)[1]}`:""}</small><strong>${FR.loading&&!FR.items.length?"…":(FR.est?"약 ":"")+FR.total.toLocaleString()}<span>편</span></strong></div>`}
+    </div>
+    <p>${FD.scope==="kr"?"대한수의학회지·한국임상수의학회지 등 국내 수의학 학술지와, 해외 학술지에 실린 한국 연구진의 수의학 논문을 모아요.":"PubMed·Europe PMC·OpenAlex·bioRxiv·Agricola에서 전 세계 수의학 논문을 모아 중복을 지워요."}</p>`;
+}
+function renderTopics(){
+  $("#topics").innerHTML=S.topics.map((t,i)=>`<button class="chip topic" type="button" data-topic="${i}" aria-pressed="${FD.topic===t}">${esc(t)}</button>`).join("")+
+    `<button class="chip ghost" type="button" data-act="addTopic">＋ 주제 추가</button>${S.topics.length?`<button class="chip ghost" type="button" data-act="editTopics">편집</button>`:""}`;
+}
+function renderFeedFilters(){
+  chipRail($("#feed-sp"),SPECIES,FD.sp,"fsp",true);
+  chipRail($("#feed-cat"),CATS,FD.cat,"fcat",false);
+  renderTopics();
+}
+async function loadFeed(more=false){
+  const token=++FR.token;
+  FR.loading=true;FR.error=null;if(!more){FR.items=[];FR.next=null;}
+  renderLive();renderFeed();
+  try{
+    let d;
+    if(FD.topic){
+      const p=new URLSearchParams({scope:FD.scope,q:FD.topic,sp:FD.sp,cat:FD.cat,years:"1",sort:"new",cursor:more&&FR.next?FR.next:"*"});
+      d=await api("/api/search?"+p);
+      d.results.sort((a,b)=>(b.date||"").localeCompare(a.date||""));
+    }else{
+      const p=new URLSearchParams({scope:FD.scope,days:FD.days,cat:FD.cat,sp:FD.sp,cursor:more&&FR.next?FR.next:"*"});
+      d=await api("/api/feed?"+p);
+      if(d.today!=null)FR.today=d.today;
+    }
+    if(token!==FR.token)return;
+    remember(d.results);
+    FR.items=more?FR.items.concat(d.results):d.results;FR.next=d.next;FR.total=d.total;FR.est=!!d.estimated;FR.updated=d.updated||new Date().toISOString();
+    if(!more&&!FD.topic){S.seen.feed=FR.items.slice(0,40).map(x=>x.key);save();$("#feed-dot").classList.remove("on");}
+    fillKo(d.results);
+  }catch(e){if(token===FR.token)FR.error=errText(e);}
+  finally{if(token===FR.token){FR.loading=false;renderLive();renderFeed();}}
+}
+function renderFeed(){
+  const box=$("#feed-list");if(!box)return;
+  if(FR.error){box.innerHTML=`<div class="err">${esc(FR.error)}</div>`;return;}
+  const sk=FR.loading?Array.from({length:FR.items.length?2:4},()=>'<div class="skel"></div>').join(""):"";
+  const empty=!FR.loading&&!FR.items.length?`<div class="empty">${FD.days===1?"오늘은 아직 새로 올라온 논문이 없어요. ‘7일’로 넓혀보세요.":"조건에 맞는 새 논문이 없어요. 축종이나 분야를 ‘전체’로 바꿔보세요."}</div>`:"";
+  const more=FR.next&&!FR.loading&&FR.items.length?`<div class="more"><button class="btn" type="button" data-act="feedMore">더 보기</button></div>`:"";
+  box.innerHTML=groupedHTML(FR.items)+sk+empty+more;
+}
+async function poll(){
+  if(document.hidden||FD.topic||FR.loading)return;
+  try{
+    const p=new URLSearchParams({scope:FD.scope,days:FD.days,cat:FD.cat,sp:FD.sp,cursor:"*"});
+    const d=await fetch("/api/feed?"+p).then(r=>r.json());
+    const have=new Set(FR.items.map(x=>x.key));
+    const fresh=(d.results||[]).filter(x=>!have.has(x.key));
+    if(d.today!=null)FR.today=d.today; FR.updated=d.updated; renderLive();
+    if(fresh.length){
+      FR.pending=d; remember(d.results);
+      const pill=$("#newpill"); pill.textContent=`↑ 새 논문 ${fresh.length}편 보기`; pill.classList.add("on");
+      if($("#view-feed").hidden)$("#feed-dot").classList.add("on");
+    }
+  }catch(e){}
+}
+function showNew(){
+  const d=FR.pending;if(!d)return;
+  FR.items=d.results;FR.next=d.next;FR.total=d.total;FR.pending=null;
+  $("#newpill").classList.remove("on");renderFeed();fillKo(d.results);window.scrollTo({top:0,behavior:"smooth"});
+}
+
+/* ================= search ================= */
+let F={scope:"global",q:"",cat:"all",sp:"all",years:"5",sort:"rel"};
+let R={items:[],next:null,total:0,query:"",loading:false,searched:false,error:null,token:0};
+function renderSearchFilters(){
+  $("#suggest").innerHTML=SUGGEST.map(s=>`<button class="chip ghost" type="button" data-q="${esc(s)}">${esc(s)}</button>`).join("");
+  chipRail($("#search-sp"),SPECIES,F.sp,"ssp",true);
+  chipRail($("#search-cat"),CATS,F.cat,"scat",false);
+}
+async function runSearch(more=false){
+  if(!F.q&&F.cat==="all"){R.searched=false;R.items=[];renderSearch();return;}
+  const token=++R.token;R.loading=true;R.error=null;if(!more){R.items=[];R.next=null;}renderSearch();
+  const p=new URLSearchParams({scope:F.scope,q:F.q,cat:F.cat,sp:F.sp,years:F.years,sort:F.sort,cursor:more&&R.next?R.next:"*"});
+  try{
+    const d=await api("/api/search?"+p);if(token!==R.token)return;
+    remember(d.results);R.items=more?R.items.concat(d.results):d.results;R.next=d.next;R.total=d.total;R.est=!!d.estimated;R.query=d.query;R.searched=true;
+    fillKo(d.results);
+  }catch(e){if(token===R.token){R.error=errText(e);R.searched=true;}}
+  finally{if(token===R.token){R.loading=false;renderSearch();}}
+}
+function renderSearchNote(){
+  const n=$("#search-note");if(!n)return;
+  n.innerHTML=F.scope==="kr"&&HEALTH.checked&&!HEALTH.kci?'<div class="banner">지금은 한국 연구진이 쓴 수의학 논문(OpenAlex)만 검색돼요. 서버에 KCI 인증키를 넣으면 국내 학술지의 국문 논문까지 함께 검색돼요.</div>':"";
+}
+function renderSearch(){
+  const box=$("#search-list");if(!box)return;
+  if(!R.searched&&!R.loading){
+    box.innerHTML=`<div class="panel"><h2>무엇이든 한국어로 찾아보세요</h2><p>‘고양이 만성신부전’, ‘아포퀠 부작용’처럼 쓰면 영어 검색식으로 바꿔 전 세계 수의학 논문에서 찾아요. 자주 보는 주제는 ‘관심 주제’로 등록하면 새 논문 피드에서 바로 볼 수 있어요.</p></div>`;return;
+  }
+  if(R.error){box.innerHTML=`<div class="err">${esc(R.error)}</div>`;return;}
+  const followed=S.topics.includes(F.q);
+  const head=R.searched?`<div class="headline"><span>${F.scope==="kr"?"국내 · ":"해외 · "}${F.q?`‘${esc(F.q)}’ `:""}<b style="color:var(--ink)">${R.est?"약 ":""}${R.total.toLocaleString()}</b>편</span>${F.q?`<button class="btn sm" type="button" data-act="follow" ${followed?"disabled":""}>${followed?"관심 주제 등록됨":"＋ 관심 주제로 등록"}</button>`:""}</div>${R.query&&R.query!==F.q?`<div class="headline"><code title="실제 검색식">${esc(R.query)}</code></div>`:""}`:"";
+  const list=R.items.map(cardHTML).join("")||(R.loading?"":`<div class="empty">검색 결과가 없어요. 기간을 ‘전체 기간’으로 넓히거나 다른 표현으로 찾아보세요.</div>`);
+  const sk=R.loading?Array.from({length:R.items.length?2:4},()=>'<div class="skel"></div>').join(""):"";
+  const more=R.next&&!R.loading&&R.items.length?`<div class="more"><button class="btn" type="button" data-act="searchMore">더 보기</button></div>`:"";
+  box.innerHTML=head+list+sk+more;
+}
+const findMeta=key=>pool.get(key)||S.saved.find(x=>x.key===key)||S.cache[key]?.meta||null;
+
+/* ================= detail ================= */
+const detail=$("#detail");
+const openSheet=()=>detail.classList.add("open"), closeSheet=()=>detail.classList.remove("open");
+function highlight(){document.querySelectorAll(".card").forEach(c=>c.classList.toggle("active",c.dataset.key===activeKey));}
+function head(title,sub,kicker,ex){return `<div class="d-head"><div><div class="kicker${ex?" ex":""}">${kicker}</div><h2>${esc(title)}</h2>${sub?`<div class="cite">${sub}</div>`:""}</div><button class="btn sm d-close" type="button" data-act="close">닫기</button></div>`;}
+const metaSub=m=>`${esc(m.journal)} ${esc(m.ref||"")} · ${esc((m.authors||"").length>70?m.authors.slice(0,70).replace(/,[^,]*$/,"")+" 외":m.authors)}`;
+const ul=a=>{a=(a||[]).filter(Boolean);return a.length?`<ul>${a.map(x=>`<li>${esc(x)}</li>`).join("")}</ul>`:'<div class="sub">원문에 명시 없음</div>';};
+function summaryHTML(d){
+  const g=String(d.evidence?.grade||"").trim().charAt(0).toUpperCase();
+  const drugs=d.drugs||[];
+  return `<div class="verdict"><p>${esc(d.one_line)}</p><div class="facts">${g?`<span><span class="grade">${g}</span><b>근거</b> ${esc(d.evidence.reason)}</span>`:""}<span><b>설계</b> ${esc(d.design||"—")}</span><span><b>대상</b> ${esc(d.n||"—")}</span></div></div>
+  <div class="sheet">
+    <div class="sec"><h4><i style="background:#3b82f6">축</i>대상 축종</h4><div class="v">${esc(d.species?.value)}</div><div class="sub">${esc(d.species?.detail)}</div></div>
+    <div class="sec"><h4><i style="background:var(--accent)">약</i>약물 및 투여 용량</h4>${drugs.length?`<div class="dose">${drugs.map(x=>`<div class="d"><b>${esc(x.name)}</b><div class="amt">${esc(x.dose)}</div><div class="meta">${[x.route,x.frequency,x.duration,x.note].filter(v=>v&&v!=="—"&&v!=="원문에 명시 없음").map(v=>`<span>${esc(v)}</span>`).join("")}</div></div>`).join("")}</div>`:'<div class="sub">원문에 명시 없음</div>'}</div>
+    <div class="sec"><h4><i style="background:#e11d48">부</i>부작용 및 금기</h4><div class="sub" style="font-weight:700">부작용</div>${ul(d.adverse?.effects)}<div class="sub" style="font-weight:700;margin-top:4px">금기·주의</div>${ul(d.adverse?.contraindications)}</div>
+    <div class="sec"><h4><i style="background:var(--mint)">예</i>임상적 예후</h4><div class="v">${esc(d.prognosis?.value)}</div>${ul(d.prognosis?.numbers)}</div>
+  </div>
+  ${(d.missing||[]).length?`<div class="missing"><b>원문에 없어 비워둔 항목</b> · ${esc(d.missing.join(", "))}</div>`:""}
+  ${(d.quotes||[]).length?`<div class="quotes"><div class="label" style="margin:0 0 2px;border:0;padding:0">원문 근거 문장</div>${d.quotes.map(q=>`<div><b>${esc(q.field)}</b>“${esc(q.quote)}”</div>`).join("")}</div>`:""}`;
+}
+const basisTag=b=>b==="fulltext"?'<span class="basis full">논문 전문 기반</span>':b==="abstract"?'<span class="basis abs">초록 기반 · 세부 용량은 원문 확인</span>':"";
+function chartText(m,d){
+  const drugs=(d.drugs||[]).map(x=>`${x.name} ${x.dose} ${x.route||""} ${x.frequency||""}`.replace(/\s+/g," ").trim()).join(" / ");
+  const ae=[...(d.adverse?.effects||[]),...(d.adverse?.contraindications||[])].join("; ");
+  const prog=[d.prognosis?.value,...(d.prognosis?.numbers||[])].filter(Boolean).join(" — ");
+  const ref=m?`${m.authors} ${m.journal} ${m.ref}`:(d.citation||d.title||"사용자 업로드 문헌");
+  return `[문헌] ${ref}\n[요점] ${d.one_line||""}\n[대상] ${d.species?.value||""}\n[약물/용량] ${drugs}\n[부작용/금기] ${ae}\n[예후] ${prog}\n※ VetBrief AI 요약 — 처방 전 원문·제품 라벨 확인`;
+}
+const loadingHTML=m=>`<div class="loading" role="status"><p>${esc(m)}</p><div class="l" style="width:90%"></div><div class="l" style="width:72%"></div><div class="l" style="width:84%"></div><div class="l" style="width:58%"></div></div>`;
+function emptyDetail(){
+  detail.innerHTML=`<div class="d-head"><div><div class="kicker">AI 임상 요약</div><h2>논문 카드의 ‘AI 요약’을 누르면 여기에 정리돼요</h2><div class="cite">대상 축종 · 약물과 용량 · 부작용과 금기 · 임상적 예후, 4가지를 한국어로</div></div></div>
+  <div class="sheet">${[["#3b82f6","축","대상 축종","예) 고양이 — IRIS 2~3기 만성신장병"],["var(--accent)","약","약물 및 투여 용량","예) Telmisartan 1 mg/kg PO q24h"],["#e11d48","부","부작용 및 금기","예) 탈수·급성 신손상 개체 제외"],["var(--mint)","예","임상적 예후","예) 단백뇨(UP/C) 유의하게 감소"]].map(([c,i,t,e])=>`<div class="sec"><h4><i style="background:${c}">${i}</i>${t}</h4><div class="sub">${e}</div></div>`).join("")}</div>
+  <div class="fine">요약은 공개된 초록 또는 오픈액세스 전문만 근거로 만들고, 근거가 된 원문 문장을 함께 보여줘요.</div>`;
+}
+function showSummary(entry){
+  const m=entry.meta;activeKey=m.key;highlight();
+  detail.innerHTML=head(S.ko[m.key]||m.ko||m.title,metaSub(m),`AI 임상 요약 ${basisTag(entry.basis)}`)+summaryHTML(entry.summary)+
+  `<div class="d-acts"><button class="btn dark" type="button" data-act="copy" data-key="${esc(m.key)}">차트에 복사</button><button class="btn" type="button" data-act="study" data-key="${esc(m.key)}">번역 학습</button><a class="btn plain" href="${esc(m.url)}" target="_blank" rel="noopener">원문 보기</a></div>
+  <div class="fine">AI 요약은 원문을 빨리 찾기 위한 보조 도구예요. 용량은 환자 상태·제품 라벨·최신 가이드라인과 함께 수의사가 최종 판단하세요.</div>`;
+}
+async function doSummary(key){
+  const m=findMeta(key);if(!m)return;
+  if(!S.cache[key]&&aiOff())return;
+  openSheet();
+  if(S.cache[key]){showSummary(S.cache[key]);return;}
+  if(!needCredit())return;
+  activeKey=key;highlight();
+  detail.innerHTML=head(S.ko[key]||m.title,metaSub(m),"AI 임상 요약")+loadingHTML("논문을 읽고 축종·용량·부작용·예후를 찾는 중이에요. 전문이 있으면 20~40초 걸려요.");
+  try{
+    const d=await api("/api/summarize",{method:"POST",body:{source:m.source,id:m.id}});
+    const entry={meta:{...m,ko:S.ko[key]||m.ko||""},basis:d.basis,summary:d.summary};
+    S.cache[key]=entry;spend();
+    const keys=Object.keys(S.cache);if(keys.length>80){keys.filter(k=>!S.saved.some(s=>s.key===k)).slice(0,keys.length-80).forEach(k=>delete S.cache[k]);save();}
+    if(activeKey===key)showSummary(entry);rerenderLists();
+  }catch(e){if(activeKey===key)detail.innerHTML=head(S.ko[key]||m.title,metaSub(m),"AI 임상 요약")+`<div class="err">${esc(errText(e))}</div><div class="d-acts"><button class="btn ai" type="button" data-act="sum" data-key="${esc(key)}">다시 시도</button><a class="btn plain" href="${esc(m.url)}" target="_blank" rel="noopener">원문 보기</a></div>`;}
+}
+async function doStudy(key,translate=false){
+  const m=findMeta(key);if(!m)return;openSheet();activeKey=key;highlight();
+  const render=d=>{const ko=d.ko||[];
+    detail.innerHTML=head(m.source==="KCI"&&m.ko?m.ko:m.title,metaSub(m),"번역 학습 · 초록 원문과 한국어")+
+    (d.koAbstract?`<div class="label" style="margin:0">국문 초록 (원문)</div><div class="kosum">${esc(d.koAbstract)}</div><div class="label" style="margin:0">영문 초록</div>`:"")+`<div class="study">${d.sentences.map((s,i)=>`<div class="srow"><div class="en">${esc(s)}</div><div>${ko[i]?esc(ko[i]):'<span class="sub" style="color:var(--faint)">번역 전</span>'}</div></div>`).join("")}</div>`+
+    ((d.glossary||[]).length?`<div class="label" style="margin:0">핵심 용어</div><div class="gloss">${d.glossary.map(g=>`<div><b>${esc(g.term)}</b><em>${esc(g.ko)}</em> · ${esc(g.note)}</div>`).join("")}</div>`:"")+
+    `<div class="d-acts">${ko.length||(HEALTH.checked&&!HEALTH.ai)?"":`<button class="btn ai" type="button" data-act="translate" data-key="${esc(key)}">한국어 번역 + 용어 사전 (1회 차감)</button>`}<button class="btn" type="button" data-act="sum" data-key="${esc(key)}">AI 요약 보기</button></div>`;};
+  if(S.study[key]?.ko?.length){render(S.study[key]);return;}
+  if(translate&&aiOff())return;
+  if(translate&&!needCredit())return;
+  detail.innerHTML=head(m.title,metaSub(m),"번역 학습")+loadingHTML(translate?"문장별로 번역하고 용어를 고르는 중…":"초록을 불러오는 중…");
+  try{const d=await api("/api/study",{method:"POST",body:{source:m.source,id:m.id,translate}});if(translate){S.study[key]=d;spend();}if(activeKey===key)render(d);}
+  catch(e){if(activeKey===key)detail.innerHTML=head(m.title,metaSub(m),"번역 학습")+`<div class="err">${esc(errText(e))}</div>`;}
+}
+
+/* ================= upload ================= */
+let docText="",docName="";
+const loadScript=src=>new Promise((res,rej)=>{const s=document.createElement("script");s.src=src;s.onload=res;s.onerror=rej;document.head.appendChild(s);});
+async function readPDF(file){
+  const st=$("#upload-status");st.textContent="PDF 여는 중…";
+  if(!window.pdfjsLib){const b="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/";await loadScript(b+"pdf.min.js");window.pdfjsLib.GlobalWorkerOptions.workerSrc=b+"pdf.worker.min.js";}
+  const pdf=await window.pdfjsLib.getDocument({data:await file.arrayBuffer()}).promise;
+  const N=Math.min(pdf.numPages,30),out=[];
+  for(let i=1;i<=N;i++){const tc=await (await pdf.getPage(i)).getTextContent();out.push(tc.items.map(x=>x.str).join(" "));st.textContent=`텍스트 읽는 중… ${i}/${N}쪽`;}
+  return out.join("\n");
+}
+async function handleFile(file){
+  if(!file)return;
+  try{docText=await readPDF(file);docName=file.name;if(docText.replace(/\s/g,"").length<200)throw 0;
+    $("#paste").value=docText.slice(0,5000)+(docText.length>5000?"\n…(미리보기는 여기까지, 분석에는 전체를 써요)":"");
+    $("#upload-status").textContent=`${file.name} · ${docText.length.toLocaleString()}자 읽음`;}
+  catch(e){docText="";$("#upload-status").textContent="PDF에서 글자를 찾지 못했어요. 스캔 이미지일 수 있어요. 초록을 붙여넣어 주세요.";}
+}
+async function analyzeDoc(){
+  const pasted=$("#paste").value.trim();
+  const text=(docText&&pasted.startsWith(docText.slice(0,200).trim()))?docText:pasted;
+  if(text.length<200){toast("초록이나 본문을 200자 이상 넣어주세요");return;}
+  if(aiOff())return;
+  if(!needCredit())return;
+  openSheet();activeKey=null;highlight();const name=docName||"붙여넣은 논문";
+  detail.innerHTML=head(name,"","내 논문 · AI 임상 요약")+loadingHTML("본문에서 축종·용량·부작용·예후를 찾는 중…");
+  try{const d=await api("/api/analyze",{method:"POST",body:{text:text.slice(0,90000)}});spend();const s=d.summary;
+    detail.innerHTML=head(s.title||name,esc(s.citation||""),"내 논문 · AI 임상 요약")+summaryHTML(s)+`<div class="d-acts"><button class="btn dark" type="button" id="copy-doc">차트에 복사</button></div><div class="fine">AI 요약은 보조 도구예요. 처방 전 원문과 제품 라벨을 확인하세요.</div>`;
+    $("#copy-doc").onclick=()=>copyText(chartText(null,s));}
+  catch(e){detail.innerHTML=head(name,"","내 논문 · AI 임상 요약")+`<div class="err">${esc(errText(e))}</div>`;}
+}
+
+/* ================= saved / me ================= */
+function renderSaved(){
+  $("#saved-count").textContent=`저장한 논문 ${S.saved.length}편`;
+  $("#saved-list").innerHTML=S.saved.length?S.saved.map(cardHTML).join(""):`<div class="empty">아직 저장한 논문이 없어요. 카드의 책갈피 아이콘을 눌러 모아두세요.</div>`;
+}
+function renderPlans(){
+  $("#plans").innerHTML=Object.entries(PLANS).map(([k,p])=>`<div class="plan${S.plan===k?" cur":""}"><div class="for">${esc(p.for)}</div><h3>${esc(p.name)}</h3><div class="price">${esc(p.price)}<small>${k==="free"?"":" / 월"}</small></div><ul>${p.perks.map(x=>`<li>${esc(x)}</li>`).join("")}</ul><button class="btn ${S.plan===k?"":"dark"}" type="button" data-plan="${k}" ${S.plan===k?"disabled":""}>${S.plan===k?"지금 쓰는 요금제":(k==="free"?"무료로 전환":"시작하기 (베타)")}</button></div>`).join("")+
+  `<div class="plan"><div class="for">설정</div><h3>베타 접속 코드</h3><p style="margin:0;font-size:13.5px;color:var(--muted)">${S.code?"코드가 저장되어 있어요.":"아직 입력하지 않았어요."}</p><button class="btn" type="button" data-act="code">코드 ${S.code?"바꾸기":"입력"}</button><button class="btn plain" type="button" data-act="reset">이번 달 사용량 초기화 (테스트용)</button></div>`;
+}
+function showPaywall(){
+  openModal(`<h3 id="modal-t">이번 달 AI 요약을 다 썼어요</h3><p>새 논문 피드와 이미 만든 요약은 계속 볼 수 있어요. 진료 중 바로 쓰려면 요금제를 올려주세요.</p>
+  <div class="plans" style="grid-template-columns:1fr 1fr">${["student","clinic"].map(k=>`<div class="plan"><div class="for">${esc(PLANS[k].for)}</div><h3>${esc(PLANS[k].name)}</h3><div class="price">${PLANS[k].price}<small> / 월</small></div><button class="btn dark sm" type="button" data-plan="${k}">시작하기</button></div>`).join("")}</div>
+  <button class="btn plain" type="button" data-act="modal-close">나중에</button>`);
+}
+async function copyText(t){
+  try{await navigator.clipboard.writeText(t);toast("차트용 텍스트를 복사했어요");}
+  catch(e){openModal(`<h3 id="modal-t">차트용 텍스트</h3><p>아래를 길게 눌러 복사하세요.</p><textarea class="copybox" id="copybox" readonly>${esc(t)}</textarea><button class="btn dark" type="button" data-act="modal-close">닫기</button>`);setTimeout(()=>{const b=$("#copybox");b.focus();b.select();},30);}
+}
+function topicModal(edit){
+  if(edit){
+    openModal(`<h3 id="modal-t">관심 주제 편집</h3><div style="display:grid;gap:8px">${S.topics.map((t,i)=>`<div class="row" style="justify-content:space-between"><span>${esc(t)}</span><button class="btn sm" type="button" data-act="delTopic" data-i="${i}">삭제</button></div>`).join("")||'<p>등록된 주제가 없어요.</p>'}</div><button class="btn dark" type="button" data-act="modal-close">완료</button>`);return;
+  }
+  openModal(`<h3 id="modal-t">관심 주제 추가</h3><p>등록한 주제의 최근 1년 새 논문을 피드에서 바로 볼 수 있어요. 예) 고양이 갑상선기능항진증, 개 쿠싱, 송아지 설사</p><form id="topic-form" style="display:grid;gap:10px"><input id="topic-in" autocomplete="off" placeholder="주제를 한국어로"><button class="btn dark" type="submit">추가</button></form>`);
+  setTimeout(()=>$("#topic-in")?.focus(),50);
+  $("#topic-form").onsubmit=e=>{e.preventDefault();const v=$("#topic-in").value.trim();if(v&&!S.topics.includes(v)){S.topics.push(v);save();}closeModal();renderTopics();if(v){FD.topic=v;renderTopics();loadFeed();}};
+}
+
+/* ================= install ================= */
+let deferredPrompt=null;
+const isStandalone=()=>matchMedia("(display-mode: standalone)").matches||navigator.standalone===true;
+const isIOS=()=>/iphone|ipad|ipod/i.test(navigator.userAgent)||(navigator.platform==="MacIntel"&&navigator.maxTouchPoints>1);
+window.addEventListener("beforeinstallprompt",e=>{e.preventDefault();deferredPrompt=e;});
+window.addEventListener("appinstalled",()=>{deferredPrompt=null;toast("VetBrief가 설치됐어요");});
+async function install(){
+  if(isStandalone()){toast("이미 앱으로 실행 중이에요");return;}
+  if(deferredPrompt){deferredPrompt.prompt();await deferredPrompt.userChoice;deferredPrompt=null;return;}
+  if(isIOS())openModal(`<h3 id="modal-t">아이폰·아이패드에 설치</h3><ol><li><b>Safari</b>로 이 페이지를 열어요</li><li>공유 버튼(네모에서 위쪽 화살표)을 눌러요</li><li><b>홈 화면에 추가</b> → <b>추가</b></li></ol><p>홈 화면의 VetBrief 아이콘으로 열면 앱처럼 전체 화면으로 실행돼요.</p><button class="btn dark" type="button" data-act="modal-close">확인</button>`);
+  else openModal(`<h3 id="modal-t">설치하기</h3><ol><li><b>안드로이드</b>: Chrome·삼성 인터넷 메뉴 → <b>앱 설치</b> 또는 <b>홈 화면에 추가</b></li><li><b>컴퓨터 Chrome·Edge</b>: 주소창 오른쪽 설치 아이콘 → <b>설치</b></li><li><b>Mac Safari</b>: <b>파일 → Dock에 추가</b></li></ol><button class="btn dark" type="button" data-act="modal-close">확인</button>`);
+}
+
+/* ================= views & events ================= */
+function setView(v){
+  document.querySelectorAll(".nav button").forEach(t=>t.setAttribute("aria-selected",String(t.dataset.view===v)));
+  ["feed","search","upload","saved","me"].forEach(x=>$("#view-"+x).hidden=x!==v);
+  detail.style.display=v==="me"?"none":"";
+  if(v==="me")renderPlans();
+  if(v==="saved")renderSaved();
+  if(v==="feed")$("#feed-dot").classList.remove("on");
+  if(v==="search")setTimeout(()=>{if(!R.searched&&matchMedia("(min-width:761px)").matches)$("#q").focus();},50);
+  closeSheet();setHdr();window.scrollTo(0,0);
+}
+function setHdr(){document.documentElement.style.setProperty("--hdr",$("#top").offsetHeight+"px");}
+window.addEventListener("resize",setHdr);
+window.addEventListener("scroll",()=>$("#top").classList.toggle("scrolled",scrollY>4),{passive:true});
+
+document.addEventListener("click",e=>{
+  const el=e.target.closest("button,[data-go]");if(!el)return;
+  const ds=el.dataset,key=ds.key;
+  if(ds.view){setView(ds.view);return;}
+  if(ds.go){setView(ds.go);return;}
+  if(ds.fscope){FD.scope=ds.fscope;document.querySelectorAll("[data-fscope]").forEach(b=>b.setAttribute("aria-pressed",String(b===el)));FR.today=null;FR.pending=null;$("#newpill").classList.remove("on");renderLive();loadFeed();return;}
+  if(ds.sscope){F.scope=ds.sscope;document.querySelectorAll("[data-sscope]").forEach(b=>b.setAttribute("aria-pressed",String(b===el)));renderSearchNote();if(R.searched||F.q)runSearch();return;}
+  if(ds.days){FD.days=+ds.days;FD.topic=null;renderTopics();loadFeed();return;}
+  if(ds.fsp){FD.sp=ds.fsp;renderFeedFilters();loadFeed();return;}
+  if(ds.fcat){FD.cat=ds.fcat;renderFeedFilters();loadFeed();return;}
+  if(ds.topic!==undefined){const t=S.topics[+ds.topic];FD.topic=FD.topic===t?null:t;renderTopics();loadFeed();return;}
+  if(ds.q!==undefined){$("#q").value=ds.q;F.q=ds.q;runSearch();return;}
+  if(ds.ssp){F.sp=ds.ssp;renderSearchFilters();runSearch();return;}
+  if(ds.scat){F.cat=ds.scat;renderSearchFilters();runSearch();return;}
+  for(const f of ["years","sort"])if(ds[f]){F[f]=ds[f];el.parentElement.querySelectorAll("button").forEach(b=>b.setAttribute("aria-pressed",String(b===el)));runSearch();return;}
+  if(ds.plan){S.plan=ds.plan;save();renderUsage();renderPlans();closeModal();toast(`${PLANS[S.plan].name}로 전환했어요 (베타)`);return;}
+  switch(ds.act){
+    case "sum":doSummary(key);break;
+    case "study":doStudy(key,false);break;
+    case "translate":doStudy(key,true);break;
+    case "feedMore":loadFeed(true);break;
+    case "searchMore":runSearch(true);break;
+    case "showNew":showNew();break;
+    case "follow":if(F.q&&!S.topics.includes(F.q)){S.topics.push(F.q);save();renderTopics();renderSearch();toast("관심 주제에 등록했어요. 새 논문 탭에서 볼 수 있어요");}break;
+    case "addTopic":topicModal(false);break;
+    case "editTopics":topicModal(true);break;
+    case "delTopic":{const t=S.topics[+ds.i];S.topics.splice(+ds.i,1);save();if(FD.topic===t){FD.topic=null;loadFeed();}renderTopics();topicModal(true);break;}
+    case "save":{const i=S.saved.findIndex(x=>x.key===key);if(i>=0)S.saved.splice(i,1);else{const m=findMeta(key);if(m)S.saved.unshift({...m,ko:S.ko[key]||m.ko});}save();rerenderLists();toast(i>=0?"저장을 취소했어요":"저장함에 담았어요");break;}
+    case "copy":{const c=S.cache[key];if(c)copyText(chartText(c.meta,c.summary));break;}
+    case "close":closeSheet();break;
+    case "modal-close":closeModal();break;
+    case "install":install();break;
+    case "code":askCode().then(renderPlans);break;
+    case "reset":S.used=0;save();renderUsage();toast("이번 달 사용량을 초기화했어요");break;
+  }
+});
+$("#search-form").addEventListener("submit",e=>{e.preventDefault();F.q=$("#q").value.trim();$("#q").blur();runSearch();});
+$("#modal").addEventListener("click",e=>{if(e.target.id==="modal")closeModal();});
+document.addEventListener("keydown",e=>{if(e.key==="Escape"){closeModal();closeSheet();}});
+$("#pdf").addEventListener("change",e=>handleFile(e.target.files[0]));
+const drop=$("#drop");
+["dragenter","dragover"].forEach(t=>drop.addEventListener(t,e=>{e.preventDefault();drop.classList.add("over");}));
+["dragleave","drop"].forEach(t=>drop.addEventListener(t,e=>{e.preventDefault();drop.classList.remove("over");}));
+drop.addEventListener("drop",e=>handleFile(e.dataTransfer.files[0]));
+$("#analyze").addEventListener("click",analyzeDoc);
+document.addEventListener("visibilitychange",()=>{if(!document.hidden)poll();});
+
+/* ================= start ================= */
+renderUsage();renderFeedFilters();renderSearchFilters();renderSearch();emptyDetail();setHdr();
+const startView=new URLSearchParams(location.search).get("view");
+if(["search","upload","saved","me"].includes(startView))setView(startView);
+fetch("/api/health").then(r=>r.json()).then(h=>{HEALTH={...h,checked:true};}).catch(()=>{HEALTH={checked:false};})
+  .finally(()=>{renderUsage();renderSearchNote();loadFeed();});
+setInterval(poll,POLL_MS);
+if("serviceWorker" in navigator)window.addEventListener("load",()=>navigator.serviceWorker.register("/sw.js").catch(()=>{}));
+</script>
+</body>
+</html>
